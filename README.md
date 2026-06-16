@@ -75,30 +75,30 @@
 `docker network inspect <ТОЧНОЕ_ИМЯ_ИЗ_ВЫВОДА> --format "{{range .Containers}}{{.Name}} {{end}}"`
 `docker network inspect n8n-minio-tesseract_n8n-network --format "{{range .Containers}}{{.Name}} {{end}}"`
 
-# Проверка заняты ли порты в Windows
+## Проверка заняты ли порты в Windows
 `netstat -ano | findstr :9000`
 
 # Настройка mc и доступов к контейнеру MINIO
 
-# 1. Зайди в контейнер minio
+## 1. Зайди в контейнер minio
 `docker exec -it minio sh
 `
-# 2. Внутри контейнера: настрой алиас с правильными креденшиалами
+## 2. Внутри контейнера: настрой алиас с правильными креденшиалами
 `mc alias set local http://localhost:9000 minioadmin minioadmin
 `
-# 3. Создай бакет (если не существует)
+## 3. Создай бакет (если не существует)
 `mc mb local/ocr`
 
-# 4. Дай публичный доступ на чтение (опционально, для тестов)
+## 4. Дай публичный доступ на чтение (опционально, для тестов)
 `mc anonymous set download local/ocr`
 
-# 5. Проверь список файлов
+## 5. Проверь список файлов
 `mc ls local/ocr`
 
-# 6. Выйди из контейнера
+## 6. Выйди из контейнера
 `exit`
 
-## Пересборка модификации образа
+# Пересборка модификации образа
 
 После изменений, например, N8N в docker-file.yml, выполнить команды:
 ```
@@ -107,7 +107,7 @@ docker compose build --no-cache n8n   # обязательно пересобр�
 docker compose up -d
 ```
 
-## Полная пересборка
+Полная пересборка
 
 ```
 docker compose config 
