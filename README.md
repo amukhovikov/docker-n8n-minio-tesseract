@@ -79,25 +79,25 @@
 `netstat -ano | findstr :9000`
 
 # Настройка mc и доступов к контейнеру MINIO
-```
+
 # 1. Зайди в контейнер minio
-docker exec -it minio sh
-
+`docker exec -it minio sh
+`
 # 2. Внутри контейнера: настрой алиас с правильными креденшиалами
-mc alias set local http://localhost:9000 minioadmin minioadmin
-
+`mc alias set local http://localhost:9000 minioadmin minioadmin
+`
 # 3. Создай бакет (если не существует)
-mc mb local/ocr
+`mc mb local/ocr`
 
 # 4. Дай публичный доступ на чтение (опционально, для тестов)
-mc anonymous set download local/ocr
+`mc anonymous set download local/ocr`
 
 # 5. Проверь список файлов
-mc ls local/ocr
+`mc ls local/ocr`
 
 # 6. Выйди из контейнера
-exit
-```
+`exit`
+
 ## Пересборка модификации образа
 
 После изменений, например, N8N в docker-file.yml, выполнить команды:
