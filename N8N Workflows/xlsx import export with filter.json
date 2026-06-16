@@ -1,0 +1,235 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "fileSelector": "/data/drivec/n8n/emp.xlsx",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        -960,
+        32
+      ],
+      "id": "f60b32f3-601e-4eea-a4c8-6c3a371d5028",
+      "name": "Read/Write Files from Disk"
+    },
+    {
+      "parameters": {
+        "operation": "xlsx",
+        "options": {
+          "headerRow": true
+        }
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        -736,
+        32
+      ],
+      "id": "2ed5dad9-71a3-4081-b1a4-64a124e9a0db",
+      "name": "Extract from File"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Забираем данные триггера (замените 'Telegram Trigger' на точное название вашей ноды)\n// const triggerData = $('Telegram Trigger').first().json;\n// const rawText = triggerData?.message?.text || triggerData?.text || '';\n// const query = rawText.trim().toLowerCase();\nconst query = $('On form submission').first().json.text.toLowerCase();\n\n// 2. Забираем распаршенные строки из предыдущей ноды (Spreadsheet File)\nconst employees = $input.all().map(item => item.json);\n\n// 3. Фильтрация\nconst filtered = employees.filter(emp => {\n  const fio = (emp.name || '').toLowerCase();\n  const city = (emp.city || '').toLowerCase();\n  return fio.includes(query) || city.includes(query);\n});\n\n// 4. Формирование ответа\nconst results = [];\n\nfiltered.forEach(emp => {\n  // Push into the results array using n8n's required structure\n  results.push({\n    json: {\n      ...emp,           // Keep existing fields\n      processed_at: new Date() // Add custom fields if needed\n    }\n  });\n});\n\n// let responseJson = [{json: {results}}];\nreturn [{json: {filtered}}];\n\n// 5. Возвращаем результат + chatId из триггера\n// return [{\n//   json: {\n//     responseText,\n//     chatId: triggerData?.message?.chat?.id || triggerData?.chat?.id\n//   }\n// }];\n  // return [{\n  //   json: {\n  //     responseText  } \n  //   }];\n\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -512,
+        32
+      ],
+      "id": "20d9c3b9-7c8c-45a8-848c-7cec351d5db0",
+      "name": "Filter & Format"
+    },
+    {
+      "parameters": {
+        "formTitle": "Поиск в базе сотрудников",
+        "formDescription": " ",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "ФИО или город",
+              "fieldName": "text"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.5,
+      "position": [
+        -1408,
+        32
+      ],
+      "id": "a9aa46aa-704d-4407-a269-c9d9fa3c0821",
+      "name": "On form submission",
+      "webhookId": "e890a6c1-a4c5-4958-9a59-0c9f2d7ad808"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "c979e4c2-4a08-480e-b635-907ba5384d3d",
+              "leftValue": "={{ $json.filtered }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "array",
+                "operation": "lengthGt",
+                "rightType": "number"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -288,
+        32
+      ],
+      "id": "54d69680-1281-46f2-9ff0-6c3490bcd8f5",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "operation": "xlsx",
+        "binaryPropertyName": "={{ $json.filtered }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        -64,
+        -16
+      ],
+      "id": "753ffed3-b3e5-4424-b60a-09645f5afe91",
+      "name": "Convert to File"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Loop over input items and add a new field called 'myNewField' to the JSON of each one\nfor (const item of $input.all()) {\n  item.json.myNewField = 1;\n}\n\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1184,
+        32
+      ],
+      "id": "160e2d0e-1be8-4b14-b2b5-4a5a1e0b2874",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "content": "## Экспорт Excel\n- запрос на текст для поиска\n- загрузка excel\n- фильтрация искомого текста\n- экспорт в excel\n\nданные из файла `C:\\n8n\\emp.xlsx`",
+        "height": 208,
+        "width": 256
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -1712,
+        -80
+      ],
+      "id": "ab14338e-e088-4d46-a7db-5ab90fb76a41",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "## Загрузка файла\n\nC:\\n8n\\file   ->   /data/drivec/n8n/file",
+        "height": 80,
+        "width": 256
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -1120,
+        -80
+      ],
+      "id": "70ae9490-f9a6-4beb-834b-65a002c7406a",
+      "name": "Sticky Note1"
+    }
+  ],
+  "connections": {
+    "Read/Write Files from Disk": {
+      "main": [
+        [
+          {
+            "node": "Extract from File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File": {
+      "main": [
+        [
+          {
+            "node": "Filter & Format",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter & Format": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "On form submission": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Convert to File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Read/Write Files from Disk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "1517a60d791142b1aa157ee8fe4233fa706c4e59dd1a664c167d6acfce915f55"
+  }
+}

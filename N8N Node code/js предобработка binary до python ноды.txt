@@ -1,0 +1,19 @@
+const items = $input.all();
+
+for (let i = 0; i < items.length; i++) {
+  // 'data' — это имя поля из ноды Read File (Put Output File in Field)
+  const buffer = await this.helpers.getBinaryDataBuffer(i, 'data');
+  
+  // Гарантируем, что json-объект существует
+  if (!items[i].json) {
+    items[i].json = {};
+  }
+  
+  // Кладем base64 строку в json
+  items[i].json.pdf_base64 = buffer.toString('base64');
+  
+  // Опционально: можно удалить binary, чтобы не передавать тяжелые ссылки дальше
+  // delete items[i].binary; 
+}
+
+return items;

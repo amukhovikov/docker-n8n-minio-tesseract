@@ -1,0 +1,24 @@
+FROM docker.m.daocloud.io/n8nio/runners:latest
+USER root
+
+# 1. Устанавливаем библиотеки для Python-раннера с обходом проверки SSL
+RUN cd /opt/runners/task-runner-python && \
+    uv pip install \
+    --trusted-host pypi.org \
+    --trusted-host files.pythonhosted.org \
+    PyMuPDF Pillow minio 
+
+# RUN cd /opt/runners/task-runner-python && \
+#     uv pip install \
+#     --index-url https://mipt.ru \
+#     --trusted-host mirror.mipt.ru \
+#     PyMuPDF Pillow minio
+
+# 2. Устанавливаем AWS SDK v3 для JavaScript-раннера
+RUN cd /opt/runners/task-runner-javascript && \
+    pnpm add @aws-sdk/client-s3 @aws-sdk/s3-request-presigner
+
+# 3. Передаем конфигурацию
+COPY n8n-task-runners.json /etc/n8n-task-runners.json
+
+USER runner

@@ -1,0 +1,213 @@
+{
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        304,
+        96
+      ],
+      "id": "19e50565-0bee-4abe-bb42-9aab64bf41e4",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "url": "=http://tesseract-api:8000/ocr-by-url?url={{ $json.internalurl }}",
+        "options": {
+          "sendCredentialsOnCrossOriginRedirect": false
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1424,
+        96
+      ],
+      "id": "8f170cfe-9c5b-452b-8c72-5eed8ac3ed00",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "resource": "bucket",
+        "name": "ocr",
+        "additionalFields": {
+          "acl": "publicReadWrite"
+        }
+      },
+      "type": "n8n-nodes-base.s3",
+      "typeVersion": 1,
+      "position": [
+        752,
+        96
+      ],
+      "id": "7cb22076-c392-425a-a953-423afc791c97",
+      "name": "Create a bucket",
+      "credentials": {
+        "s3": {
+          "id": "7WX1Y7xQo8tSZnqn",
+          "name": "S3 account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "upload",
+        "bucketName": "ocr",
+        "binaryPropertyName": "={{ $('ReadFile').item.binary.data }}",
+        "additionalFields": {
+          "acl": "publicReadWrite"
+        }
+      },
+      "type": "n8n-nodes-base.s3",
+      "typeVersion": 1,
+      "position": [
+        976,
+        96
+      ],
+      "id": "feda081d-29c2-4bdc-b7dc-fb1941ec6cd8",
+      "name": "Upload a file",
+      "credentials": {
+        "s3": {
+          "id": "7WX1Y7xQo8tSZnqn",
+          "name": "S3 account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fileSelector": "/data/drivec/n8n/resume.png",
+        "options": {
+          "dataPropertyName": "data"
+        }
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        528,
+        96
+      ],
+      "id": "dc4cf882-4d00-49f9-8d39-4f4913969db7",
+      "name": "ReadFile"
+    },
+    {
+      "parameters": {
+        "jsCode": "const { S3Client, GetObjectCommand } = require('@aws-sdk/client-s3');\nconst { getSignedUrl } = require('@aws-sdk/s3-request-presigner');\n\n// === 1. Получаем входные данные ===\nconst fileName = $('ReadFile').item.binary.data.fileName;\n\n// === 2. Конфигурация ===\nconst bucketName = 'ocr';\nconst expirySeconds = 3600; // 1 час\n\ntry {\n  // === 3. Инициализация S3 клиента (настроенного на MinIO) ===\n  const client = new S3Client({\n    region: 'us-east-1', // Для MinIO region не важен, но нужен SDK\n    endpoint: 'http://minio:9000', // DNS-имя контейнера\n    credentials: {\n      accessKeyId: 'minioadmin',\n      secretAccessKey: 'minioadmin',\n    },\n    forcePathStyle: true, // КРИТИЧЕСКИ ВАЖНО для MinIO!\n  });\n\n  // === 4. Формирование команды ===\n  const command = new GetObjectCommand({\n    Bucket: bucketName,\n    Key: fileName,\n  });\n\n  // === 5. Генерация presigned URL ===\n  const presignedUrl = await getSignedUrl(client, command, { expiresIn: expirySeconds });\n\n  // === 6. Возврат результата ===\n  return [{\n    json: {\n      filename: fileName,\n      bucket: bucketName,\n      internalurl: presignedUrl,\n      expiresAt: new Date(Date.now() + expirySeconds * 1000).toISOString()\n    }\n  }];\n\n} catch (error) {\n  const errorDetails = error?.message || String(error);\n  console.error('❌ MinIO/S3 Error:', errorDetails);\n\n  return [{\n    json: {\n      error: true,\n      message: errorDetails,\n      fileName,\n      hint: errorDetails.includes('NoSuchKey') ? 'Файл не найден в бакете' :\n            errorDetails.includes('ECONNREFUSED') ? 'MinIO недоступен' :\n            'Проверьте логи и настройки бакета'\n    }\n  }];\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        96
+      ],
+      "id": "2252cc72-64d9-429c-908c-f83e911eb0fb",
+      "name": "S3URL"
+    },
+    {
+      "parameters": {
+        "content": "## Распознавание PNG через S3 Minio \n- загрузка PNG\n- сохранение в S3\n- распознавание через Tesseract\n\nданные из файла `C:\\n8n\\resume.png`",
+        "height": 272
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "01c21a29-386b-4bb3-bedb-00072a4c9ed8",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "## Нода S3 Minio\n\nhttp://minio:9000\n\nНастройки подключения\nminioadmin / minioadmin\nForce Path Style",
+        "height": 144
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        704,
+        -64
+      ],
+      "id": "8aa98f8f-3249-43be-b7b4-2a33578ac5ac",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "## Загрузка файла\n\nC:\\n8n\\file   ->   /data/drivec/n8n/file",
+        "height": 80,
+        "width": 256
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        368,
+        -48
+      ],
+      "id": "9a2d737b-5484-4e19-9248-dd580d1af161",
+      "name": "Sticky Note2"
+    }
+  ],
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "ReadFile",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create a bucket": {
+      "main": [
+        [
+          {
+            "node": "Upload a file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload a file": {
+      "main": [
+        [
+          {
+            "node": "S3URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ReadFile": {
+      "main": [
+        [
+          {
+            "node": "Create a bucket",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "S3URL": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "1517a60d791142b1aa157ee8fe4233fa706c4e59dd1a664c167d6acfce915f55"
+  }
+}

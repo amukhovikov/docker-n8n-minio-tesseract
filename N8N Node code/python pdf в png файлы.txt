@@ -1,0 +1,53 @@
+import fitz  # PyMuPDF
+import base64
+
+# === 1. Получаем входные данные ===
+if not _items:
+    raise Exception("Входящие данные пусты.")
+
+input_data = _items[0]
+
+# === 2. Забираем base64 из JSON (который подготовила JS-нода) ===
+pdf_base64 = input_data.get('json', {}).get('pdf_base64')
+
+if not pdf_base64:
+    raise Exception("pdf_base64 не найден в json. Убедитесь, что перед Python нодой стоит JS нода для извлечения буфера.")
+
+# === 3. Обработка PDF ===
+pdf_bytes = base64.b64decode(pdf_base64)
+
+try:
+    doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+except Exception as e:
+    raise Exception(f"Не удалось открыть PDF. Возможно, файл поврежден или это не PDF. Ошибка: {str(e)}")
+
+output_items = []
+
+# Цикл по всем страницам PDF
+for page_num in range(len(doc)):
+    page = doc[page_num]
+    
+    # Рендеринг страницы в картинку
+    pix = page.get_pixmap(dpi=150) 
+    png_bytes = pix.tobytes("png")
+    
+    # Кодируем обратно в base64 для n8n
+    png_base64 = base64.b64encode(png_bytes).decode('utf-8')
+    
+    # Формируем структуру элемента n8n
+    output_items.append({
+        "json": {
+            "pageNumber": page_num + 1,
+            "totalPages": len(doc)
+        },
+        "binary": {
+            "data": {
+                "mimeType": "image/png",
+                "data": png_base64,
+                "fileName": f"page_{page_num + 1}.png"
+            }
+        }
+    })
+
+# Возвращаем массив страниц в n8n
+return output_items

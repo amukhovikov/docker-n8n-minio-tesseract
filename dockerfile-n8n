@@ -1,0 +1,23 @@
+# dockerfile-n8n — минимальная версия
+# FROM docker.m.daocloud.io/n8nio/n8n:latest
+FROM hub.rat.dev/n8nio/n8n:latest
+
+# Ничего не устанавливаем!
+# n8n будет обращаться к tesseract-api по сети: http://tesseract-api:8000
+
+USER root
+
+WORKDIR /tmp/minio-pkg
+
+# 1. Чистый package.json, чтобы npm не парсил конфиги n8n
+RUN echo '{"name":"temp"}' > package.json
+
+# 2. Установка с флагами, отключающими зависающие проверки
+RUN npm install --no-audit --no-fund --legacy-peer-deps --registry=https://registry.npmjs.org/ minio
+
+# 3. Копируем через tar (гарантированно работает с правами и симлинками)
+RUN cd /tmp/minio-pkg/node_modules && tar cf - . | tar xf - -C /usr/local/lib/node_modules/n8n/node_modules
+
+# 4. Чистим временные файлы
+RUN rm -rf /tmp/minio-pkg
+USER node

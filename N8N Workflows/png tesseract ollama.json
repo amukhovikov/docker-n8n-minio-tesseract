@@ -1,0 +1,185 @@
+{
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        320,
+        -48
+      ],
+      "id": "203fe9ee-61a5-4350-89ce-30ea9d6ae9c5",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "fileSelector": "/data/drivec/n8n/resume.png",
+        "options": {
+          "dataPropertyName": "data"
+        }
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        544,
+        -48
+      ],
+      "id": "95be34ac-3f38-4065-bd41-397167fa3dc8",
+      "name": "Read/Write Files from Disk"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Я хочу перенести свое резюме строго в формат моего шаблона Word. Твоя задача — взять информацию из моего текущего резюме и распределить её по разделам шаблона. Ничего не придумывай, просто измени структуру и формулировки под образец. Перед переносом проверь русский язык - в случае наличия дефисом, означающих перенос слова, удали их. В случае наличия сочетаний \"\\n\" удали их. Отвечай только фактами, без приветствий, без пояснений и без дополнительных рассуждений. Вот структура моего целевого шаблона:\n\n\nФИО\nОпыт работы\nНавыки\nsoft skills\nhard skills\n\nТекст резюме: \n {{ $json.text }}",
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        992,
+        -48
+      ],
+      "id": "08c372ad-5833-475d-a428-e719e66e6a7a",
+      "name": "Basic LLM Chain"
+    },
+    {
+      "parameters": {
+        "model": "n8n-assistant-base:latest",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [
+        1072,
+        176
+      ],
+      "id": "0295134f-ca49-4de5-98de-31fceb277c51",
+      "name": "Ollama Chat Model",
+      "credentials": {
+        "ollamaApi": {
+          "id": "vbe1qrDTtEcQ8HNn",
+          "name": "Ollama account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://tesseract-api:8000/ocr",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "data"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        768,
+        -48
+      ],
+      "id": "f61bdb45-ee07-4dd8-9990-4fa81718ee8c",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "content": "## Распознавание PNG с вызовом ИИ\n- загрузка PNG\n- распознавание через Tesseract\n- вызов Ollama с инструкциями\n\nданные из файла `C:\\n8n\\resume.png`",
+        "height": 288
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -16,
+        -64
+      ],
+      "id": "c6913fa2-4622-4354-aedf-ecf67a2234f2",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "## OLLAMA HOST\n\n[http://192.168.233.51:11434/](http://192.168.233.51:11434/)"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1264,
+        144
+      ],
+      "id": "79da95b3-0290-4fc6-a3f4-25899ce58989",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "## Загрузка файла\n\nC:\\n8n\\file   ->   /data/drivec/n8n/file",
+        "height": 80,
+        "width": 256
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        320,
+        144
+      ],
+      "id": "c59fe38e-6961-4532-9a9b-38fc6ec98645",
+      "name": "Sticky Note2"
+    }
+  ],
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Read/Write Files from Disk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read/Write Files from Disk": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "1517a60d791142b1aa157ee8fe4233fa706c4e59dd1a664c167d6acfce915f55"
+  }
+}

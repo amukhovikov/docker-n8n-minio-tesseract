@@ -1,0 +1,126 @@
+{
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        192,
+        112
+      ],
+      "id": "600e13b1-add9-4d7a-adc3-a58be6943bd9",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "fileSelector": "/data/drivec/n8n/resume.pdf",
+        "options": {
+          "dataPropertyName": "data"
+        }
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        416,
+        112
+      ],
+      "id": "2d863336-8712-4a34-923e-73d0822d8e68",
+      "name": "ReadFile"
+    },
+    {
+      "parameters": {
+        "language": "pythonNative",
+        "pythonCode": "import fitz  # PyMuPDF\nimport base64\n\n# === 1. Получаем входные данные ===\nif not _items:\n    raise Exception(\"Входящие данные пусты.\")\n\ninput_data = _items[0]\n\n# === 2. Забираем base64 из JSON (который подготовила JS-нода) ===\npdf_base64 = input_data.get('json', {}).get('pdf_base64')\n\nif not pdf_base64:\n    raise Exception(\"pdf_base64 не найден в json. Убедитесь, что перед Python нодой стоит JS нода для извлечения буфера.\")\n\n# === 3. Обработка PDF ===\npdf_bytes = base64.b64decode(pdf_base64)\n\ntry:\n    doc = fitz.open(stream=pdf_bytes, filetype=\"pdf\")\nexcept Exception as e:\n    raise Exception(f\"Не удалось открыть PDF. Возможно, файл поврежден или это не PDF. Ошибка: {str(e)}\")\n\noutput_items = []\n\n# Цикл по всем страницам PDF\nfor page_num in range(len(doc)):\n    page = doc[page_num]\n    \n    # Рендеринг страницы в картинку\n    pix = page.get_pixmap(dpi=150) \n    png_bytes = pix.tobytes(\"png\")\n    \n    # Кодируем обратно в base64 для n8n\n    png_base64 = base64.b64encode(png_bytes).decode('utf-8')\n    \n    # Формируем структуру элемента n8n\n    output_items.append({\n        \"json\": {\n            \"pageNumber\": page_num + 1,\n            \"totalPages\": len(doc)\n        },\n        \"binary\": {\n            \"data\": {\n                \"mimeType\": \"image/png\",\n                \"data\": png_base64,\n                \"fileName\": f\"page_{page_num + 1}.png\"\n            }\n        }\n    })\n\n# Возвращаем массив страниц в n8n\nreturn output_items"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        864,
+        112
+      ],
+      "id": "ac382777-152f-462b-860a-3c237c5e6c56",
+      "name": "Code in Python"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nfor (let i = 0; i < items.length; i++) {\n  // 'data' — это имя поля из ноды Read File (Put Output File in Field)\n  const buffer = await this.helpers.getBinaryDataBuffer(i, 'data');\n  \n  // Гарантируем, что json-объект существует\n  if (!items[i].json) {\n    items[i].json = {};\n  }\n  \n  // Кладем base64 строку в json\n  items[i].json.pdf_base64 = buffer.toString('base64');\n  \n  // Опционально: можно удалить binary, чтобы не передавать тяжелые ссылки дальше\n  // delete items[i].binary; \n}\n\nreturn items;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        640,
+        112
+      ],
+      "id": "3d94cd32-91f7-471a-af7d-69a06be560a3",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "content": "## Конвертация PDF в PNG\n- загрузка многостраничного PDF \n- вывод результата в PNG (несколько файлов)\n\nданные из файла `C:\\n8n\\resume.pdf`",
+        "height": 224
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -192,
+        0
+      ],
+      "id": "50daed7d-bf12-43b3-87e8-f56e8955cc30",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "## Загрузка файла\n\nC:\\n8n\\file   ->   /data/drivec/n8n/file",
+        "height": 80,
+        "width": 256
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        176,
+        0
+      ],
+      "id": "b4981ca2-9b8a-4fda-a9ea-f21a335a0316",
+      "name": "Sticky Note1"
+    }
+  ],
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "ReadFile",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ReadFile": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Code in Python",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "1517a60d791142b1aa157ee8fe4233fa706c4e59dd1a664c167d6acfce915f55"
+  }
+}

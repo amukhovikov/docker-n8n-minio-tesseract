@@ -1,0 +1,22 @@
+FROM python:3.12-slim
+
+# Установка системного Tesseract и языковых пакетов
+RUN apt-get update && apt-get install -y \
+    tesseract-ocr \
+    libtesseract-dev \
+    tesseract-ocr-rus \
+    && apt-get clean -y
+
+WORKDIR /app
+COPY requirements.txt .
+# RUN pip install --no-cache-dir -r requirements.txt
+
+RUN pip install --default-timeout=1000 \
+    --no-cache-dir \
+    --trusted-host pypi.org \
+    --trusted-host files.pythonhosted.org \
+    -r requirements.txt
+
+COPY . .
+
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

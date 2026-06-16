@@ -1,0 +1,149 @@
+networks:
+  n8n-network:
+    driver: bridge
+
+volumes:
+  n8n_data:
+  minio_data:
+
+services:
+  minio:
+    image: docker.io/minio/minio:RELEASE.2025-07-18T21-56-31Z
+    container_name: minio
+    networks:
+      - n8n-network
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+      - MINIO_SERVER_URL=http://localhost:9000
+      - MINIO_DOMAIN=localhost
+    command: server /data --console-address ":9001"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  minio-init:
+    image: minio/mc
+    container_name: minio-init
+    depends_on:
+      minio:
+        condition: service_healthy # Ждем, пока healthcheck minio вернет success
+    networks:
+      - n8n-network
+    entrypoint: >
+      /bin/sh -c "
+      echo 'Ожидание доступности MinIO...';
+      /usr/bin/mc alias set local http://minio:9000 minioadmin minioadmin;
+      
+      echo 'Предоставить права minioadmin к local';
+      /usr/bin/mc admin policy attach local readwrite --user=minioadmin;
+      
+      echo 'Создание бакета для бинарных данных N8N...';
+      /usr/bin/mc mb local/n8n-binary-data --ignore-existing;
+      
+      echo 'Создание бакета для OCR (твой Python код)...';
+      /usr/bin/mc mb local/ocr --ignore-existing;
+      
+      echo 'Настройка политик доступа n8n-binary-data (опционально)...';
+      /usr/bin/mc anonymous set download local/n8n-binary-data;
+      
+      echo 'Настройка политик доступа ocr (опционально)...';
+      /usr/bin/mc anonymous set download local/ocr;
+
+      echo 'Инициализация MinIO завершена успешно!';
+      exit 0;
+      "
+
+  n8n:
+    build:
+      context: ./
+      dockerfile: dockerfile-n8n
+    container_name: n8n
+    networks:
+      - n8n-network
+    ports:
+      - "5678:5678"
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - /c/:/data/drivec
+    environment:
+      - N8N_HOST=localhost
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - NODE_FUNCTION_ALLOW_EXTERNAL=minio
+      - N8N_BINARY_DATA_STORAGE_MODE=s3
+      - N8N_BINARY_DATA_S3_BUCKET_NAME=n8n-binary-data
+      - N8N_BINARY_DATA_S3_REGION=us-east-1
+      - N8N_BINARY_DATA_S3_ENDPOINT=http://minio:9000
+      - N8N_BINARY_DATA_S3_ACCESS_KEY_ID=minioadmin
+      - N8N_BINARY_DATA_S3_SECRET_ACCESS_KEY=minioadmin
+      - N8N_BINARY_DATA_S3_FORCE_PATH_STYLE=true
+      - N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=true
+      - N8N_RESTRICT_FILE_ACCESS_TO=/data/drivec;/home/node/.n8n-files
+      - N8N_RUNNERS_MODE=external
+      - N8N_RUNNERS_BROKER_LISTEN_ADDRESS=0.0.0.0
+      - N8N_RUNNERS_HOST=python-runner
+      - N8N_RUNNERS_PORT=5679
+      - N8N_RUNNERS_AUTH_TOKEN=super_secret_token_123
+      - N8N_RUNNERS_TASK_REQUEST_TIMEOUT=180000
+    depends_on:
+      minio:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully # N8N ждет, пока init-контейнер отработает и выйдет (exit 0)
+      python-runner:
+        condition: service_started
+    restart: unless-stopped
+
+  python-runner:
+    build:
+      context: ./python-runner
+      dockerfile: dockerfile
+    container_name: python-runner
+    networks:
+      - n8n-network
+    environment:
+      - N8N_RUNNERS_AUTH_TOKEN=super_secret_token_123
+      - N8N_RUNNERS_TASK_BROKER_URI=http://n8n:5679
+    volumes:
+      - ./python-runner/n8n-task-runners.json:/etc/n8n-task-runners.json
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: "1"
+
+  tesseract-api:
+    build:
+      context: ./tesseract-api
+      dockerfile: dockerfile
+      network: host
+    container_name: tesseract-api
+    networks:
+      - n8n-network
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    extra_hosts:
+      - "localhost:host-gateway"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)"]
+      interval: 60s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"

@@ -1,0 +1,63 @@
+import fitz  # PyMuPDF
+import base64
+from PIL import Image
+import io
+
+if not _items:
+    raise Exception("Входящие данные пусты.")
+
+images = []
+
+# === 1. Собираем все страницы из ВСЕХ объектов списка ===
+for item in _items:
+    pdf_base64 = item.get('json', {}).get('pdf_base64')
+    if not pdf_base64:
+        continue
+        
+    pdf_bytes = base64.b64decode(pdf_base64)
+    doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+    
+    for page_num in range(len(doc)):
+        page = doc[page_num]
+        pix = page.get_pixmap(dpi=150)
+        # Конвертируем pixmap PyMuPDF в объект PIL Image
+        img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+        images.append(img)
+
+if not images:
+    raise Exception("Не найдено ни одной страницы для склейки.")
+
+# === 2. Склеиваем все картинки в одну длинную вертикальную полосу ===
+total_width = max(img.width for img in images)
+total_height = sum(img.height for img in images)
+
+# Создаем пустое белое полотно
+combined_image = Image.new('RGB', (total_width, total_height), color=(255, 255, 255))
+
+# Вставляем страницы одну за другой сверху вниз
+y_offset = 0
+for img in images:
+    combined_image.paste(img, (0, y_offset))
+    y_offset += img.height
+
+# === 3. Конвертируем итоговый коллаж в base64 ===
+buffer = io.BytesIO()
+combined_image.save(buffer, format="PNG")
+final_png_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+
+# === 4. Возвращаем ОДИН объект в n8n ===
+return [{
+    "json": {
+        "totalProcessedItems": len(_items),
+        "totalPagesCombined": len(images),
+        "finalHeight": total_height,
+        "finalWidth": total_width
+    },
+    "binary": {
+        "data": {
+            "mimeType": "image/png",
+            "data": final_png_base64,
+            "fileName": "combined_all_pages.png"
+        }
+    }
+}]

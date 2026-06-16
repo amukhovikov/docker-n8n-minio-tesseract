@@ -1,0 +1,163 @@
+{
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        272,
+        80
+      ],
+      "id": "f5a0bef0-0990-4936-8116-3430016b6b9d",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "fileSelector": "/data/drivec/n8n/resume.pdf",
+        "options": {
+          "dataPropertyName": "data"
+        }
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        496,
+        80
+      ],
+      "id": "7feb9696-fd8f-4452-8c4e-fe13986c4dde",
+      "name": "ReadFile"
+    },
+    {
+      "parameters": {
+        "language": "pythonNative",
+        "pythonCode": "import fitz  # PyMuPDF\nimport base64\nfrom PIL import Image\nimport io\n\nif not _items:\n    raise Exception(\"Входящие данные пусты.\")\n\nimages = []\n\n# === 1. Собираем все страницы из ВСЕХ объектов списка ===\nfor item in _items:\n    pdf_base64 = item.get('json', {}).get('pdf_base64')\n    if not pdf_base64:\n        continue\n        \n    pdf_bytes = base64.b64decode(pdf_base64)\n    doc = fitz.open(stream=pdf_bytes, filetype=\"pdf\")\n    \n    for page_num in range(len(doc)):\n        page = doc[page_num]\n        pix = page.get_pixmap(dpi=150)\n        # Конвертируем pixmap PyMuPDF в объект PIL Image\n        img = Image.frombytes(\"RGB\", [pix.width, pix.height], pix.samples)\n        images.append(img)\n\nif not images:\n    raise Exception(\"Не найдено ни одной страницы для склейки.\")\n\n# === 2. Склеиваем все картинки в одну длинную вертикальную полосу ===\ntotal_width = max(img.width for img in images)\ntotal_height = sum(img.height for img in images)\n\n# Создаем пустое белое полотно\ncombined_image = Image.new('RGB', (total_width, total_height), color=(255, 255, 255))\n\n# Вставляем страницы одну за другой сверху вниз\ny_offset = 0\nfor img in images:\n    combined_image.paste(img, (0, y_offset))\n    y_offset += img.height\n\n# === 3. Конвертируем итоговый коллаж в base64 ===\nbuffer = io.BytesIO()\ncombined_image.save(buffer, format=\"PNG\")\nfinal_png_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')\n\n# === 4. Возвращаем ОДИН объект в n8n ===\nreturn [{\n    \"json\": {\n        \"totalProcessedItems\": len(_items),\n        \"totalPagesCombined\": len(images),\n        \"finalHeight\": total_height,\n        \"finalWidth\": total_width\n    },\n    \"binary\": {\n        \"data\": {\n            \"mimeType\": \"image/png\",\n            \"data\": final_png_base64,\n            \"fileName\": \"combined_all_pages.png\"\n        }\n    }\n}]"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        944,
+        80
+      ],
+      "id": "333a91e4-388d-4597-ac72-53aae87d3a62",
+      "name": "Code in Python"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nfor (let i = 0; i < items.length; i++) {\n  // 'data' — это имя поля из ноды Read File (Put Output File in Field)\n  const buffer = await this.helpers.getBinaryDataBuffer(i, 'data');\n  \n  // Гарантируем, что json-объект существует\n  if (!items[i].json) {\n    items[i].json = {};\n  }\n  \n  // Кладем base64 строку в json\n  items[i].json.pdf_base64 = buffer.toString('base64');\n  \n  // Опционально: можно удалить binary, чтобы не передавать тяжелые ссылки дальше\n  // delete items[i].binary; \n}\n\nreturn items;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        80
+      ],
+      "id": "b6d95b88-9095-46a2-a751-a06dfead1b18",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "content": "## Распознавание PDF\n- загрузит PDF\n- сконвертирует в один PNG \n- распознает в Tesseract\n\nданные из файла `C:\\n8n\\resume.pdf`",
+        "height": 224
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -112,
+        -32
+      ],
+      "id": "09df19e0-5835-4f10-9ef1-09580dc77976",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://tesseract-api:8000/ocr",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "data"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1168,
+        80
+      ],
+      "id": "812c48dd-f08a-4208-92fe-45c2eb42f8f8",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "content": "## Загрузка файла\n\nC:\\n8n\\file   ->   /data/drivec/n8n/file",
+        "height": 80,
+        "width": 256
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        256,
+        -48
+      ],
+      "id": "a16f48d8-69df-4d76-8eee-68af830dd6e0",
+      "name": "Sticky Note1"
+    }
+  ],
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "ReadFile",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ReadFile": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in Python": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Code in Python",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "1517a60d791142b1aa157ee8fe4233fa706c4e59dd1a664c167d6acfce915f55"
+  }
+}

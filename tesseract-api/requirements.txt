@@ -1,0 +1,6 @@
+fastapi
+uvicorn[standard]>=0.24.0  # для запуска сервера
+httpx>=0.25.0              # асинхронные HTTP-запросы
+Pillow>=10.1.0             # работа с изображениями (PIL)
+pytesseract>=0.3.10        # обёртка над Tesseract OCR
+python-multipart

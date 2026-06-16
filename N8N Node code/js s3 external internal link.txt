@@ -1,0 +1,76 @@
+// скрипт для генерации внешней (браузер) и внутренней ссылки (для API) для файла в s3
+
+
+const { Client } = require('minio');
+
+// === 1. Получаем входные данные ===
+const fileName = $('ReadFile').item.binary.data.fileName;
+
+// === 2. Конфигурация ===
+const config = {
+  port: 9000,
+  useSSL: false,
+  accessKey: 'minioadmin',
+  secretKey: 'minioadmin',
+  bucketName: 'ocr',
+  expirySeconds: 3600, // 1 час
+};
+
+try {
+  // === 3. Клиент для браузера (эндпоинт: localhost) ===
+  const browserClient = new Client({
+    endPoint: 'localhost',
+    port: config.port,
+    useSSL: config.useSSL,
+    accessKey: config.accessKey,
+    secretKey: config.secretKey,
+  });
+
+  // === 4. Клиент для внутренних сервисов (эндпоинт: minio) ===
+  const internalClient = new Client({
+    endPoint: 'minio',  // DNS-имя контейнера в docker-compose
+    port: config.port,
+    useSSL: config.useSSL,
+    accessKey: config.accessKey,
+    secretKey: config.secretKey,
+  });
+
+  // === 5. Генерация URL (параллельно для скорости) ===
+  const [presignedUrlBrowser, presignedUrlInternal] = await Promise.all([
+    browserClient.presignedGetObject(config.bucketName, fileName, config.expirySeconds),
+    internalClient.presignedGetObject(config.bucketName, fileName, config.expirySeconds),
+  ]);
+
+  // === 6. Возврат результата в формате n8n ===
+  return [{
+    json: {
+      fileName,
+      bucket: config.bucketName,
+      presignedUrlBrowser,    // http://localhost:9000/... → для браузера
+      presignedUrlInternal,   // http://minio:9000/... → для tesseract-api
+      expiresAt: new Date(Date.now() + config.expirySeconds * 1000).toISOString()
+    },
+    // binary: input.binary  // Сохраняем binary-поток для следующих нод
+  }];
+
+} catch (error) {
+  // === 7. Детальное логирование ошибок ===
+  const errorDetails = error?.message || error?.code || error?.name || String(error);
+  const stack = error?.stack || '';
+  
+  console.error('❌ MinIO Error:', errorDetails, stack);
+
+  return [{
+    json: {
+      error: true,
+      message: errorDetails,
+      fileName,
+      hint: errorDetails.includes('ECONNREFUSED') ? 'Проверь, запущен ли контейнер minio' :
+            errorDetails.includes('NoSuchBucket') ? 'Бакет ocr не существует. Создай: mc mb local/ocr' :
+            errorDetails.includes('AccessDenied') ? 'Неверные accessKey/secretKey' :
+            errorDetails.includes('SignatureDoesNotMatch') ? 'Подпись привязана к хосту. Используй правильный endPoint' :
+            'Смотри логи в Execution Details → Logs'
+    },
+    // binary: input.binary
+  }];
+}

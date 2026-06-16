@@ -1,0 +1,44 @@
+// 1. Забираем данные триггера (замените 'Telegram Trigger' на точное название вашей ноды)
+// const triggerData = $('Telegram Trigger').first().json;
+// const rawText = triggerData?.message?.text || triggerData?.text || '';
+// const query = rawText.trim().toLowerCase();
+const query = $('On form submission').first().json.text.toLowerCase();
+
+// 2. Забираем распаршенные строки из предыдущей ноды (Spreadsheet File)
+const employees = $input.all().map(item => item.json);
+
+// 3. Фильтрация
+const filtered = employees.filter(emp => {
+  const fio = (emp.name || '').toLowerCase();
+  const city = (emp.city || '').toLowerCase();
+  return fio.includes(query) || city.includes(query);
+});
+
+// 4. Формирование ответа
+const results = [];
+
+filtered.forEach(emp => {
+  // Push into the results array using n8n's required structure
+  results.push({
+    json: {
+      ...emp,           // Keep existing fields
+      processed_at: new Date() // Add custom fields if needed
+    }
+  });
+});
+
+// let responseJson = [{json: {results}}];
+return [{json: {filtered}}];
+
+// 5. Возвращаем результат + chatId из триггера
+// return [{
+//   json: {
+//     responseText,
+//     chatId: triggerData?.message?.chat?.id || triggerData?.chat?.id
+//   }
+// }];
+  // return [{
+  //   json: {
+  //     responseText  } 
+  //   }];
+
